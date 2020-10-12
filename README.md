@@ -27,6 +27,7 @@ cargo skyline new [your_plugin_name]
 * [Docker](https://www.docker.com/get-started)
 * [Visual Studio Code](https://code.visualstudio.com/)
 * [Visual Studio Code Remote Development Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack)
+* Copy [these files](https://gist.github.com/jugeeya/ebdf699e3dc442dc1706e4ee6587b86f) to a new directory called `.devcontainer` after cloning this repo.
 
 Simply run `Remote Containers: Reopen in Container` in the Command Palette. 
 
