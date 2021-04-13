@@ -18,7 +18,7 @@ fn test_replacement() -> u32 {
     val + 1
 }
 
-#[skyline::main(name = "skyline_rs_template")]
+#[skyline::main(name = "smashline")]
 pub fn main() {
     println!("Hello from Skyline Rust Plugin!");
 
