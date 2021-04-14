@@ -1,30 +1,22 @@
 #![feature(proc_macro_hygiene)]
 
-use skyline::{hook, install_hook};
+pub use smashline_macro::*;
 
-extern "C" fn test() -> u32 {
-    2
+#[macro_export]
+macro_rules! install_hooks {
+    ($($fn:ident),* $(,)?) => {
+        $(
+            smashline::install_hook!($fn);
+        )*
+    }
 }
 
-#[hook(replace = test)]
-fn test_replacement() -> u32 {
-
-    let original_test = original!();
-
-    let val = original_test();
-
-    println!("[override] original value: {}", val); // 2
-
-    val + 1
+pub enum StaticSymbol {
+    Resolved(usize),
+    Unresolved(&'static str)
 }
 
-#[skyline::main(name = "smashline")]
-pub fn main() {
-    println!("Hello from Skyline Rust Plugin!");
-
-    install_hook!(test_replacement);
-
-    let x = test();
-
-    println!("[main] test returned: {}", x); // 3
+extern "Rust" {
+    pub fn replace_symbol(module: &str, symbol: &str, replace: *const extern "C" fn(), original: Option<&'static mut *const extern "C" fn()>);
+    pub fn replace_static_symbol(symbol: StaticSymbol, replace: *const extern "C" fn(), original: Option<&'static mut *const extern "C" fn()>);
 }
