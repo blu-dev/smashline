@@ -9,26 +9,48 @@ use crate::{remove_mut, get_ident};
 
 fn generate_fighter_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Ident, orig_name: &syn::Ident) -> TokenStream2 {
     let install_name = quote::format_ident!("{}_smashline_agent_frame_install", usr_fn_name);
-    let agent = &attrs.agent;
-    quote!(
-        pub fn #install_name() {
-            unsafe { 
-                smashline::replace_fighter_frame(#agent, Some(&mut #orig_name), #usr_fn_name);
+    if let Some(agent) = &attrs.agent {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe { 
+                    smashline::replace_fighter_frame(#agent, Some(&mut #orig_name), #usr_fn_name);
+                }
             }
-        }
-    ).into()
+        ).into()
+    } else {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe {
+                    smashline::replace_symbol("common", "_ZN7lua2cpp16L2CFighterCommon31sys_line_system_control_fighterEv", #usr_fn_name as *const extern "C" fn(), Some(&mut #orig_name));
+                }
+            }
+        ).into()
+    }
 }
 
 fn generate_weapon_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Ident, orig_name: &syn::Ident) -> TokenStream2 {
     let install_name = quote::format_ident!("{}_smashline_agent_frame_install", usr_fn_name);
-    let agent = &attrs.agent;
-    quote!(
-        pub fn #install_name() {
-            unsafe {
-                smashline::replace_weapon_frame(#agent, Some(&mut #orig_name), #usr_fn_name);
+    if let Some(agent) = &attrs.agent {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe {
+                    smashline::replace_weapon_frame(#agent, Some(&mut #orig_name), #usr_fn_name);
+                }
             }
-        }
-    ).into()
+        ).into()
+    } else {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe {
+                    smashline::replace_symbol("common", "_ZN7lua2cpp14L2CFighterBase23sys_line_system_controlEv", #usr_fn_name as *const extern "C" fn(), Some(&mut #orig_name));
+                }
+            }
+        ).into()
+    }
 }
 
 pub fn install_agent_frame(input: TokenStream) -> TokenStream {
@@ -97,5 +119,46 @@ pub fn agent_frame(attrs: TokenStream, input: TokenStream, is_fighter: bool) -> 
 
         #[allow(non_upper_case_globals)]
         static mut #orig_name: *const extern "C" fn() = 0 as _;
+    ).into()
+}
+
+pub fn install_agent_reset(input: TokenStream) -> TokenStream {
+    let usr_fn_name = parse_macro_input!(input as syn::Ident);
+    let install_name = quote::format_ident!("{}_smashline_agent_reset_install", usr_fn_name);
+    quote!(
+        #install_name();
+    ).into()
+}
+
+pub fn agent_reset(input: TokenStream, is_fighter: bool) -> TokenStream {
+    let usr_fn = parse_macro_input!(input as syn::ItemFn);
+
+    let usr_fn_name = usr_fn.sig.ident.clone();
+    let install_name = quote::format_ident!("{}_smashline_agent_reset_install", usr_fn_name);
+
+    let install_fn = if is_fighter {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe {
+                    smashline::add_fighter_reset_callback(#usr_fn_name);
+                }
+            }
+        )
+    } else {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe {
+                    smashline::add_agent_reset_callback(#usr_fn_name);
+                }
+            }
+        )
+    };
+
+    quote!(
+        #usr_fn
+
+        #install_fn
     ).into()
 }

@@ -8,6 +8,8 @@ pub use smashline_macro::*;
 
 type FighterFrame = extern "C" fn(&mut L2CFighterCommon) -> L2CValue;
 type WeaponFrame = extern "C" fn(&mut L2CFighterBase) -> L2CValue;
+type FighterReset = fn(&mut L2CFighterCommon);
+type AgentReset = fn(&mut L2CFighterBase);
 
 #[macro_export]
 macro_rules! install_hooks {
@@ -45,6 +47,15 @@ macro_rules! install_agent_frames {
     }
 }
 
+#[macro_export]
+macro_rules! install_agent_resets {
+    ($($fn:ident),* $(,)?) => {
+        $(
+            smashline::install_agent_reset!($fn);
+        )*
+    }
+}
+
 pub enum StaticSymbol {
     Resolved(usize),
     Unresolved(&'static str)
@@ -71,7 +82,11 @@ extern "Rust" {
 
     pub fn replace_acmd_script(agent: Hash40, script: Hash40, original: Option<&'static mut *const extern "C" fn()>, category: AcmdCategory, low_priority: bool, bind_fn: *const extern "C" fn());
     pub fn replace_status_script(agent: Hash40, script: LuaConstant, condition: LuaConstant, original: Option<&'static mut *const extern "C" fn()>, low_priority: bool, replacement: *const extern "C" fn());
+    pub fn replace_common_status_script(script: LuaConstant, condition: LuaConstant, original: Option<&'static mut *const extern "C" fn()>, replacement: *const extern "C" fn());
 
     pub fn replace_fighter_frame(agent: LuaConstant, original: Option<&'static mut *const extern "C" fn()>, replacement: FighterFrame);
     pub fn replace_weapon_frame(agent: LuaConstant, original: Option<&'static mut *const extern "C" fn()>, replacement: WeaponFrame);
+
+    pub fn add_fighter_reset_callback(callback: FighterReset);
+    pub fn add_agent_reset_callback(callback: AgentReset);
 }

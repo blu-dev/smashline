@@ -86,3 +86,46 @@ pub fn status_script(attr: TokenStream, input: TokenStream) -> TokenStream {
         static mut #orig_name: *const extern "C" fn() = 0 as _;
     ).into()
 }
+
+pub fn common_status_script(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    let attrs = parse_macro_input!(attrs as CommonStatusAttrs);
+    let input = parse_macro_input!(input as syn::ItemFn);
+
+
+    let hook_attrs = HookAttrs {
+        module: HookModule::Lazy(syn::LitStr::new("common", Span::call_site())),
+        symbol: HookSymbol::Unresolved(attrs.symbol.unwrap_or(syn::LitStr::new("", Span::call_site())))
+    };
+
+    let usr_fn_name = input.sig.ident.clone();
+    let install_name = quote::format_ident!("{}_smashline_status_script_install", usr_fn_name);
+
+    let orig_name = quote::format_ident!("{}_smashline_hook_orig", usr_fn_name);
+
+    let status = &attrs.status;
+    let condition = &attrs.condition;
+
+    let hook_fn = crate::hook::generate_hook_fn(&hook_attrs, input);
+    if let HookSymbol::Unresolved(symbol) = &hook_attrs.symbol {
+        let install_fn = quote!(
+            pub fn #install_name() {
+                unsafe {
+                    if #symbol != "" {
+                        smashline::replace_symbol("common", #symbol, #usr_fn_name as *const extern "C" fn(), Some(&mut #orig_name));
+                        smashline::replace_common_status_script(#status, #condition, None, #usr_fn_name as *const extern "C" fn());
+                    } else {
+                        smashline::replace_common_status_script(#status, #condition, Some(&mut #orig_name), #usr_fn_name as *const extern "C" fn());
+                    }
+                }
+            }
+        );
+
+        quote!(
+            #install_fn
+            #hook_fn
+        ).into()
+    } else {
+        unreachable!()
+    }
+
+}

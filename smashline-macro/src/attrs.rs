@@ -15,6 +15,7 @@ mod kw {
     syn::custom_keyword!(low_priority);
     syn::custom_keyword!(status);
     syn::custom_keyword!(condition);
+    syn::custom_keyword!(global);
 }
 
 // taken from skyline-rs hooking implementation
@@ -340,8 +341,58 @@ impl Parse for StatusAttrs {
     }
 }
 
+pub struct CommonStatusAttrs {
+    pub status: LuaConst,
+    pub condition: LuaConst,
+    pub symbol: Option<syn::LitStr>
+}
+
+impl Parse for CommonStatusAttrs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let status = if input.peek(kw::status) {
+            let MetaItem::<kw::status, LuaConst> { item: lua_const, .. } = input.parse()?;
+
+            Ok(lua_const)
+        } else {
+            Err(input.error(format!(
+                "Expected keyword '{}' in macro declaration.", "status".bright_blue()
+            )))
+        }?;
+
+        let _: Token![,] = input.parse()?;
+
+        let condition = if input.peek(kw::condition) {
+            let MetaItem::<kw::condition, LuaConst> { item: lua_const, .. } = input.parse()?;
+
+            Ok(lua_const)
+        } else {
+            Err(input.error(format!(
+                "Expected keyword '{}' in macro declaration.", "condition".bright_blue()
+            )))
+        }?;
+
+        let symbol = if let Ok(_) = input.parse::<Token![,]>() {
+            if let Ok(MetaItem::<kw::symbol, syn::LitStr> { item: symbol, .. }) = input.parse::<MetaItem::<kw::symbol, syn::LitStr>>() {
+                Ok(Some(symbol))
+            } else {
+                Err(input.error(
+                    "Extra comma in macro declaration."
+                ))
+            }
+        } else {
+            Ok(None)
+        }?;
+
+        Ok(CommonStatusAttrs {
+            status,
+            condition,
+            symbol
+        })
+    }
+}
+
 pub struct AgentFrameAttrs {
-    pub agent: LuaConst,
+    pub agent: Option<LuaConst>,
     pub is_replace: bool
 }
 
@@ -350,10 +401,13 @@ impl Parse for AgentFrameAttrs {
         let agent = if input.peek(kw::agent) {
             let MetaItem::<kw::agent, LuaConst> { item: lua_const, .. } = input.parse()?;
 
-            Ok(lua_const)
+            Ok(Some(lua_const))
+        } else if input.peek(kw::global) {
+            let _: kw::global = input.parse()?;
+            Ok(None)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "agent".bright_blue()
+                "Expected keywords '{}' or '{}' in macro declaration.", "agent".bright_blue(), "global".bright_blue()
             )))
         }?;
 

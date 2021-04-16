@@ -81,6 +81,11 @@ pub fn status_script(attrs: TokenStream, input: TokenStream) -> TokenStream {
     status::status_script(attrs, input)
 }
 
+#[proc_macro_attribute]
+pub fn common_status_script(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    status::common_status_script(attrs, input)
+}
+
 #[proc_macro]
 pub fn install_status_script(input: TokenStream) -> TokenStream {
     status::install_status_script(input)
@@ -99,4 +104,19 @@ pub fn weapon_frame(attrs: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn install_agent_frame(input: TokenStream) -> TokenStream {
     callbacks::install_agent_frame(input)
+}
+
+#[proc_macro_attribute]
+pub fn fighter_reset(_: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_reset(input, true)
+}
+
+#[proc_macro_attribute]
+pub fn agent_reset(_: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_reset(input, false)
+}
+
+#[proc_macro]
+pub fn install_agent_reset(input: TokenStream) -> TokenStream {
+    callbacks::install_agent_reset(input)
 }

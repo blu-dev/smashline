@@ -78,10 +78,10 @@ pub fn install_hook(input: TokenStream) -> TokenStream {
     ).into()
 }
 
-pub fn hook(attrs: TokenStream, input: TokenStream) -> TokenStream {
-    let mut replacement_fn = parse_macro_input!(input as syn::ItemFn);
-    let HookAttrs { module, symbol } = parse_macro_input!(attrs as HookAttrs);
+pub fn generate_hook_fn(attrs: &HookAttrs, mut replacement_fn: syn::ItemFn) -> TokenStream2 {
     let mut output = TokenStream2::new();
+
+    let HookAttrs { module, symbol } = attrs;
 
     if let HookModule::Lazy(module) = &module {
         if let HookSymbol::Resolved(_symbol) = &symbol {
@@ -138,16 +138,33 @@ pub fn hook(attrs: TokenStream, input: TokenStream) -> TokenStream {
     };
     replacement_fn.block.stmts.insert(1, orig_macro);
 
-    replacement_fn.to_tokens(&mut output);
-
-    let install_fn = generate_install_fn(&module, &symbol, &usr_fn, &orig_fn);
-
     quote!(
-        #install_fn
+        #replacement_fn
 
         #[allow(non_upper_case_globals)]
         pub static mut #orig_fn: *const extern "C" fn() = 0 as _;
     ).to_tokens(&mut output);
 
     output.into()
+}
+
+pub fn hook(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    let replacement_fn = parse_macro_input!(input as syn::ItemFn);
+    let attrs = parse_macro_input!(attrs as HookAttrs);
+
+    let usr_fn = replacement_fn.sig.ident.clone();
+
+    let orig_fn = quote::format_ident!(
+        "{}_smashline_hook_orig", usr_fn
+    );
+
+    let without_install = generate_hook_fn(&attrs, replacement_fn);
+
+    let install_fn = generate_install_fn(&attrs.module, &attrs.symbol, &usr_fn, &orig_fn);
+
+    quote!(
+        #without_install
+
+        #install_fn
+    ).into()
 }
