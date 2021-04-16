@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 syn = { version = "1", features = ["full", "extra-traits"] }
+synstructure = "0.12.4"
 quote = "1.0"
 proc-macro2 = "1.0"
 owo-colors = "1.3"

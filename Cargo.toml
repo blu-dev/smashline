@@ -6,7 +6,8 @@ edition = "2018"
 
 [dependencies]
 skyline = { git = "https://github.com/ultimate-research/skyline-rs.git" }
-skyline_smash = { git = "https://github.com/ultimate-research/skyline-smash.git" }
+skyline_smash = { path = "../skyline-smash", features = ["weak_l2cvalue"] }
+# skyline_smash = { git = "https://github.com/ultimate-research/skyline-smash.git" }
 smashline-macro = { path = "./smashline-macro" }
 
 [profile.dev]

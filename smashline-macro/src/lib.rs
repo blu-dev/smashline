@@ -1,117 +1,21 @@
 #![feature(asm)]
 #![feature(const_loop)]
 #![feature(const_if_match)]
-use syn::{parse_quote, parse_macro_input, Token, token};
-use syn::parse::{Parse, ParseStream};
+use syn::{Attribute, token, AttrStyle, Ident};
 use proc_macro::TokenStream;
-use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::{ToTokens, quote};
+use proc_macro2::{TokenStream as TokenStream2, Span};
 
-use owo_colors::OwoColorize;
+mod acmd;
+mod attrs;
+mod callbacks;
+mod derive;
+mod hook;
+mod status;
 
-mod kw {
-    syn::custom_keyword!(module);
-    syn::custom_keyword!(symbol);
-}
+use attrs::*;
+use hook::*;
 
-
-enum HookModule {
-    Lazy(syn::LitStr),
-    Static(token::Static)
-}
-
-impl Parse for HookModule {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        if let Ok(module_name) = input.parse::<syn::LitStr>() {
-            Ok(HookModule::Lazy(module_name))
-        } else {
-            let static_kw = input.parse()?;
-            Ok(HookModule::Static(static_kw))
-        }
-    }
-}
-
-enum HookSymbol {
-    Resolved(syn::Path),
-    Unresolved(syn::LitStr)
-}
-
-impl Parse for HookSymbol {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        if let Ok(symbol) = input.parse::<syn::LitStr>() {
-            Ok(HookSymbol::Unresolved(symbol))
-        } else {
-            let symbol = input.parse()?;
-            Ok(HookSymbol::Resolved(symbol))
-        }
-    }
-}
-
-struct HookAttrs {
-    pub module: HookModule,
-    pub symbol: HookSymbol
-}
-
-impl Parse for HookAttrs {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let module = if input.peek(kw::module) {
-            let MetaItem::<kw::module, HookModule> { item: module_name, .. } = input.parse()?;
-
-            Ok(module_name)
-        } else {
-            Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "module".bright_blue()
-            )))
-        }?;
-
-        let _: syn::Token![,] = input.parse()?;
-
-        let symbol = if input.peek(kw::symbol) {
-            let MetaItem::<kw::symbol, HookSymbol> { item: symbol, .. } = input.parse()?;
-            Ok(symbol)
-        } else {
-            Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "symbol".bright_blue()
-            )))
-        }?;
-
-        Ok(HookAttrs {
-            module,
-            symbol
-        })
-    }
-}
-
-// taken from skyline-rs hooking implementation
-struct MetaItem<Keyword: Parse, Item: Parse> {
-    pub ident: Keyword,
-    pub item: Item
-}
-
-impl<Keyword: Parse, Item: Parse> Parse for MetaItem<Keyword, Item> {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let ident = input.parse()?;
-        let item = if input.peek(token::Paren) {
-            let content;
-            syn::parenthesized!(content in input);
-            content.parse()?
-        } else if input.peek(token::Bracket)  {
-            let content;
-            syn::bracketed!(content in input);
-            content.parse()?
-        } else {
-            input.parse::<Token![=]>()?;
-            input.parse()?
-        };
-
-        Ok(Self {
-            ident,
-            item
-        })
-    }
-}
-
-fn remove_mut(arg: &syn::FnArg) -> syn::FnArg {
+pub(crate) fn remove_mut(arg: &syn::FnArg) -> syn::FnArg {
     let mut arg = arg.clone();
     if let syn::FnArg::Typed(ref mut arg) = arg {
         if let syn::Pat::Ident(ref mut arg) = *arg.pat {
@@ -123,146 +27,76 @@ fn remove_mut(arg: &syn::FnArg) -> syn::FnArg {
     arg
 }
 
-fn generate_install_fn(module: &HookModule, symbol: &HookSymbol, usr_fn: &syn::Ident, orig_fn: &syn::Ident) -> impl ToTokens {
-    let install_fn = quote::format_ident!(
-        "{}_smashline_hook_install_fn", usr_fn
-    );
-
-    if let HookModule::Lazy(module) = module {
-        if let HookSymbol::Resolved(symbol) = symbol {
-            syn::Error::new(module.span(), "Lazy (module) hooks cannot use resolved symbols.").into_compile_error()
-        } else if let HookSymbol::Unresolved(symbol) = symbol{
-            quote! {
-                #[allow(unused_unsafe)]
-                pub fn #install_fn() {
-                    unsafe {
-                        if (smashline::replace_symbol as *const ()).is_null() {
-                            panic!("smashline::replace_symbol is missing -- maybe missing libsmashline_hook.nro?");
-                        }
-                        smashline::replace_symbol(#module, #symbol, #usr_fn as *const extern "C" fn(), Some(&mut #orig_fn));
-                    }
-                }
-            }
-        } else {
-            unreachable!()
+pub(crate) fn get_ident(arg: &syn::FnArg) -> syn::Ident {
+    if let syn::FnArg::Typed(arg) = arg {
+        if let syn::Pat::Ident(arg) = &*arg.pat {
+            return arg.ident.clone();
         }
-    } else if let HookModule::Static(module) = module {
-        if let HookSymbol::Resolved(symbol) = symbol {
-            quote! {
-                #[allow(unused_unsafe)]
-                pub fn #install_fn() {
-                    unsafe {
-                        if (smashline::replace_static_symbol as *const ()).is_null() {
-                            panic!("smashline::replace_static_symbol is missing -- maybe missing libsmashline_hook.nro?");
-                        }
-                        smashline::replace_static_symbol(smashline::StaticSymbol::Resolved(#symbol as *const () as usize), #usr_fn as *const extern "C" fn(), Some(&mut #orig_fn));
-                    }
-                }
-            }
-        } else if let HookSymbol::Unresolved(symbol) = symbol {
-            quote! {
-                #[allow(unused_unsafe)]
-                pub fn #install_fn() {
-                    unsafe {
-                        if (smashline::replace_static_symbol as *const ()).is_null() {
-                            panic!("smashline::replace_static_symbol is missing -- maybe missing libsmashline_hook.nro?");
-                        }
-                        smashline::replace_static_symbol(smashline::StaticSymbol::Unresolved(#symbol), #usr_fn as *const extern "C" fn(), Some(&mut #orig_fn));
-                    }
-                }
-            }
-        } else {
-            unreachable!()
-        }
-    } else {
-        unreachable!()
     }
+    panic!("Agent frames require arguments to be named.")
 }
 
-#[proc_macro]
-pub fn install_hook(input: TokenStream) -> TokenStream {
-    let name = parse_macro_input!(input as syn::Ident);
-    let install_fn = quote::format_ident!(
-        "{}_smashline_hook_install_fn", name
-    );
-    quote!(
-        unsafe { #install_fn(); }
-    ).into()
+pub(crate) fn new_attr(attr_name: &str, args: Option<&str>) -> syn::Attribute {
+    let tokens = if let Some(args) = args {
+        args.parse().unwrap()
+    } else {
+        TokenStream2::new()
+    };
+    syn::Attribute {
+        pound_token: token::Pound { spans: [Span::call_site()]},
+        style: AttrStyle::Outer,
+        bracket_token: token::Bracket { span: Span::call_site() },
+        path: Ident::new(attr_name, Span::call_site()).into(),
+        tokens
+    }
 }
 
 #[proc_macro_attribute]
 pub fn hook(attrs: TokenStream, input: TokenStream) -> TokenStream {
-    let mut replacement_fn = parse_macro_input!(input as syn::ItemFn);
-    let HookAttrs { module, symbol } = parse_macro_input!(attrs as HookAttrs);
-    let mut output = TokenStream2::new();
+    hook::hook(attrs, input)
+}
 
-    if let HookModule::Lazy(ref module) = &module {
-        if let HookSymbol::Resolved(ref symbol) = &symbol {
-            return syn::Error::new(module.span(), "Lazy (module) hooks cannot use resolved symbols.").into_compile_error().into();
-        }
-    }
+#[proc_macro]
+pub fn install_hook(input: TokenStream) -> TokenStream {
+    hook::install_hook(input)
+}
 
-    // extern "C"
-    replacement_fn.sig.abi = Some(syn::Abi {
-        extern_token: syn::token::Extern { span: Span::call_site() },
-        name: Some(syn::LitStr::new("C", Span::call_site()))
-    });
+#[proc_macro_derive(LuaStruct)]
+pub fn derive_lua_struct(item: TokenStream) -> TokenStream {
+    derive::derive_lua_struct(item)
+}
 
-    let args_tokens = replacement_fn.sig.inputs.iter().map(remove_mut);
-    let return_tokens = replacement_fn.sig.output.to_token_stream();
+#[proc_macro_attribute]
+pub fn acmd_script(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    acmd::acmd_script(attrs, input)
+}
 
-    let usr_fn = replacement_fn.sig.ident.clone();
+#[proc_macro]
+pub fn install_acmd_script(input: TokenStream) -> TokenStream {
+    acmd::install_acmd_script(input)
+}
 
-    let orig_fn = quote::format_ident!(
-        "{}_smashline_hook_original_fn", usr_fn
-    );
+#[proc_macro_attribute]
+pub fn status_script(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    status::status_script(attrs, input)
+}
 
-    let usr_fn_str = syn::LitStr::new(usr_fn.to_string().as_str(), Span::call_site());
+#[proc_macro]
+pub fn install_status_script(input: TokenStream) -> TokenStream {
+    status::install_status_script(input)
+}
 
-    // allow for original!() and call_original! like in skyline-rs
-    let orig_macro: syn::Stmt = parse_quote! {
-        macro_rules! original {
-            () => {
-                {
-                    #[allow(unused_unsafe)]
-                    if true {
-                        unsafe {
-                            if #orig_fn.is_null() {
-                                panic!("Error calling function hook {}, original function not in memory.", #usr_fn_str);
-                            } else {
-                                std::mem::transmute::<_, extern "C" fn(#(#args_tokens),*) #return_tokens>(
-                                    #orig_fn as *const()
-                                )
-                            }
-                        }
-                    } else {
-                        unreachable!()
-                    }
-                }
-            }
-        }
-    };
+#[proc_macro_attribute]
+pub fn fighter_frame(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_frame(attrs, input, true)
+}
 
-    replacement_fn.block.stmts.insert(0, orig_macro);
-    let orig_macro: syn::Stmt = parse_quote! {
-        macro_rules! call_original {
-            ($($args:expr),* $(,)?) => {
-                original!()($($args),*)
-            }
-        }
-    };
-    replacement_fn.block.stmts.insert(1, orig_macro);
+#[proc_macro_attribute]
+pub fn weapon_frame(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_frame(attrs, input, false)
+}
 
-    replacement_fn.to_tokens(&mut output);
-
-    let install_fn = generate_install_fn(&module, &symbol, &usr_fn, &orig_fn);
-
-    quote!(
-        #install_fn
-
-        #[allow(non_upper_case_globals)]
-        pub static mut #orig_fn: *const extern "C" fn() = 0 as _;
-    ).to_tokens(&mut output);
-
-    output.into()
+#[proc_macro]
+pub fn install_agent_frame(input: TokenStream) -> TokenStream {
+    callbacks::install_agent_frame(input)
 }
