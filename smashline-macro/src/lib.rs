@@ -6,6 +6,7 @@ use proc_macro::TokenStream;
 use proc_macro2::{TokenStream as TokenStream2, Span};
 use quote::{quote, ToTokens};
 
+mod acmd_lang;
 mod acmd;
 mod attrs;
 mod callbacks;
@@ -146,4 +147,14 @@ pub fn uninstaller(_: TokenStream, input: TokenStream) -> TokenStream {
         #[export_name = "smashline_uninstall"]
         #usr_fn
     ).into()
+}
+
+#[proc_macro]
+pub fn generate_acmd_is_execute(input: TokenStream) -> TokenStream {
+    acmd_lang::generate_acmd_is_execute(input)
+}
+
+#[proc_macro]
+pub fn acmd(input: TokenStream) -> TokenStream {
+    acmd_lang::acmd(input)
 }
