@@ -149,6 +149,21 @@ pub fn uninstaller(_: TokenStream, input: TokenStream) -> TokenStream {
     ).into()
 }
 
+#[proc_macro_attribute]
+pub fn fighter_frame_callback(_: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_frame_callback(input, true)
+}
+
+#[proc_macro_attribute]
+pub fn weapon_frame_callback(_: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_frame_callback(input, false)
+}
+
+#[proc_macro]
+pub fn install_agent_frame_callback(input: TokenStream) -> TokenStream {
+    callbacks::install_agent_frame_callback(input)
+}
+
 #[proc_macro]
 pub fn generate_acmd_is_execute(input: TokenStream) -> TokenStream {
     acmd_lang::generate_acmd_is_execute(input)

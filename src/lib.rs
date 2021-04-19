@@ -59,19 +59,10 @@ macro_rules! install_agent_resets {
 }
 
 #[macro_export]
-macro_rules! install_fighter_frame_callbacks {
+macro_rules! install_agent_frame_callbacks {
     ($($fn:ident),* $(,)?) => {
         $(
-            unsafe { smashline::add_fighter_frame_callback($fn) }; 
-        )*
-    }
-}
-
-#[macro_export]
-macro_rules! install_weapon_frame_callbacks {
-    ($($fn:ident),* $(,)?) => {
-        $(
-            unsafe { smashline::add_weapon_frame_callback($fn) }; 
+            smashline::install_agent_frame_callback!($fn); 
         )*
     }
 }

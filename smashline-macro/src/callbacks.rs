@@ -73,6 +73,15 @@ pub fn agent_frame(attrs: TokenStream, input: TokenStream, is_fighter: bool) -> 
     });
 
     let args_tokens = usr_fn.sig.inputs.iter().map(remove_mut);
+    if let syn::ReturnType::Default = usr_fn.sig.output {
+        if attrs.is_replace {
+            return syn::Error::new(
+                usr_fn.sig.ident.span(),
+                "Agent frames that 'override' must specify the return type. Try adding '-> smash::lib::L2CValue'"
+            ).into_compile_error().into();
+        }
+        usr_fn.sig.output = parse_quote! { -> smash::lib::L2CValue };
+    }
     let return_tokens = usr_fn.sig.output.to_token_stream();
 
     let orig_name = quote::format_ident!("{}_smashline_agent_frame_orig", usr_fn_name);
@@ -103,6 +112,9 @@ pub fn agent_frame(attrs: TokenStream, input: TokenStream, is_fighter: bool) -> 
         let args_names = usr_fn.sig.inputs.iter().map(get_ident);
         usr_fn.block.stmts.insert(1, parse_quote! {
             let original_result = original!(#(#args_names),*);
+        });
+        usr_fn.block.stmts.push(parse_quote! {
+            return original_result;
         });
     }
 
@@ -151,6 +163,46 @@ pub fn agent_reset(input: TokenStream, is_fighter: bool) -> TokenStream {
             pub fn #install_name() {
                 unsafe {
                     smashline::add_agent_reset_callback(#usr_fn_name);
+                }
+            }
+        )
+    };
+
+    quote!(
+        #usr_fn
+
+        #install_fn
+    ).into()
+}
+
+pub fn install_agent_frame_callback(input: TokenStream) -> TokenStream {
+    let usr_fn_name = parse_macro_input!(input as syn::Ident);
+    let install_name = quote::format_ident!("{}_smashline_agent_frame_callback_install", usr_fn_name);
+    quote!(
+        #install_name();
+    ).into()
+}
+
+pub fn agent_frame_callback(input: TokenStream, is_fighter: bool) -> TokenStream {
+    let usr_fn = parse_macro_input!(input as syn::ItemFn);
+    let usr_fn_name = usr_fn.sig.ident.clone();
+    let install_name = quote::format_ident!("{}_smashline_agent_frame_callback_install", usr_fn_name);
+
+    let install_fn = if is_fighter {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe {
+                    smashline::add_fighter_frame_callback(#usr_fn_name);
+                }
+            }
+        )
+    } else {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe {
+                    smashline::add_weapon_frame_callback(#usr_fn_name);
                 }
             }
         )
