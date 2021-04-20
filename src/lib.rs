@@ -73,7 +73,7 @@ macro_rules! install_agent_frame_callbacks {
 macro_rules! install_agent_init_callbacks {
     ($($fn:ident),* $(,)?) => {
         $(
-            smashline::instll_agent_init_callback!($fn);
+            smashline::install_agent_init_callback!($fn);
         )*
     }
 }
