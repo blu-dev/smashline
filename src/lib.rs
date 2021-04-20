@@ -12,6 +12,8 @@ type FighterFrameCallback = fn(&mut L2CFighterCommon);
 type WeaponFrameCallback = fn(&mut L2CFighterBase);
 type FighterReset = fn(&mut L2CFighterCommon);
 type AgentReset = fn(&mut L2CFighterBase);
+type FighterInit = fn(&mut L2CFighterCommon);
+type AgentInit = fn(&mut L2CFighterBase);
 
 #[macro_export]
 macro_rules! install_hooks {
@@ -67,6 +69,15 @@ macro_rules! install_agent_frame_callbacks {
     }
 }
 
+#[macro_export]
+macro_rules! install_agent_init_callbacks {
+    ($($fn:ident),* $(,)?) => {
+        $(
+            smashline::install_agent_init_callback!($fn);
+        )*
+    }
+}
+
 pub enum StaticSymbol {
     Resolved(usize),
     Unresolved(&'static str)
@@ -103,4 +114,7 @@ extern "Rust" {
 
     pub fn add_fighter_frame_callback(callback: FighterFrameCallback);
     pub fn add_weapon_frame_callback(callback: WeaponFrameCallback);
+
+    pub fn add_fighter_init_callback(callback: FighterInit);
+    pub fn add_agent_init_callback(callback: AgentInit);
 }
