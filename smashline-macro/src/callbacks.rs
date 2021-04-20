@@ -214,3 +214,43 @@ pub fn agent_frame_callback(input: TokenStream, is_fighter: bool) -> TokenStream
         #install_fn
     ).into()
 }
+
+pub fn install_agent_init_callback(input: TokenStream) -> TokenStream {
+    let usr_fn_name = parse_macro_input!(input as syn::Ident);
+    let install_name = quote::format_ident!("{}_smashline_agent_init_callback_install", usr_fn_name);
+    quote!(
+        #install_name();
+    ).into()
+}
+
+pub fn agent_init_callback(input: TokenStream, is_fighter: bool) -> TokenStream {
+    let usr_fn = parse_macro_input!(input as syn::ItemFn);
+    let usr_fn_name = usr_fn.sig.ident.clone();
+    let install_name = quote::format_ident!("{}_smashline_agent_init_callback_install", usr_fn_name);
+
+    let install_fn = if is_fighter {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe {
+                    smashline::add_fighter_init_callback(#usr_fn_name);
+                }
+            }
+        )
+    } else {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe {
+                    smashline::add_agent_init_callback(#usr_fn_name);
+                }
+            }
+        )
+    };
+
+    quote!(
+        #usr_fn
+
+        #install_fn
+    ).into()
+}

@@ -173,3 +173,18 @@ pub fn generate_acmd_is_execute(input: TokenStream) -> TokenStream {
 pub fn acmd(input: TokenStream) -> TokenStream {
     acmd_lang::acmd(input)
 }
+
+#[proc_macro_attribute]
+pub fn fighter_init(_: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_init_callback(input, true)
+}
+
+#[proc_macro_attribute]
+pub fn agent_init(_: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_init_callback(input, false)
+}
+
+#[proc_macro]
+pub fn install_agent_init_callback(input: TokenStream) -> TokenStream {
+    callbacks::install_agent_init_callback(input)
+}
