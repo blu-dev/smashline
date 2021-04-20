@@ -364,10 +364,12 @@ pub fn acmd(input: TokenStream) -> TokenStream {
     let acmd_stmts = acmd_input.acmd.statements;
 
     quote!(
-        #setup
-
-        #(
-            #acmd_stmts
-        )*
+        unsafe {
+            #setup
+    
+            #(
+                #acmd_stmts
+            )*
+        }
     ).into()
 }
