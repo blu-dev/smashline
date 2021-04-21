@@ -52,7 +52,7 @@ fn generate_original_macro(usr_fn_name: &syn::Ident, orig_name: &syn::Ident, val
                                 if #orig_name.is_null() {
                                     panic!("Error calling ACMD script {}, original function not in memory.", stringify!(#usr_fn_name));
                                 }
-                                std::mem::transmute::<_, extern "C" fn(&mut smash::lua2cpp::L2CAgentBase, *mut smash::lib::utility::Variadic)>(#orig_name)(agent, &0u64 as *const u64 as _);
+                                std::mem::transmute::<_, extern "C" fn(&mut smash::lua2cpp::L2CAgentBase, *mut smash::lib::utility::Variadic)>(#orig_name)($agent, &0u64 as *const u64 as _);
                             }
                         } else {
                             unreachable!()
