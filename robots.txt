@@ -1,0 +1,5 @@
+User-agent: *
+
+Disallow: /norobots/
+
+Sitemap: https://blu-dev.github.io/smashline/smashline/sitemap.xml
