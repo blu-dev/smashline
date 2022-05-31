@@ -116,7 +116,7 @@ pub fn acmd_script(attr: TokenStream, input: TokenStream) -> TokenStream {
         #[inline(never)]
         unsafe extern "C" fn #bind_fn_name(agent: &mut smash::lua2cpp::L2CAgentBase, _: &mut smash::lib::utility::Variadic) {
             #usr_new_name(agent);
-            asm!(r#"
+            std::arch::asm!(r#"
             b #0x8
             .byte 0xE5, 0xB1, 0x00, 0xB0
             "#)
