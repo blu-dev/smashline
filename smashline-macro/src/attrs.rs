@@ -1,7 +1,7 @@
-use syn::{parse_quote, parse_macro_input, Token, token, punctuated, bracketed};
-use syn::parse::{Parse, ParseStream};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
+use syn::parse::{Parse, ParseStream};
+use syn::{bracketed, parse_macro_input, parse_quote, punctuated, token, Token};
 
 use owo_colors::OwoColorize;
 
@@ -16,12 +16,13 @@ mod kw {
     syn::custom_keyword!(status);
     syn::custom_keyword!(condition);
     syn::custom_keyword!(global);
+    syn::custom_keyword!(feature);
 }
 
 // taken from skyline-rs hooking implementation
 pub struct MetaItem<Keyword: Parse, Item: Parse> {
     pub ident: Keyword,
-    pub item: Item
+    pub item: Item,
 }
 
 impl<Keyword: Parse, Item: Parse> Parse for MetaItem<Keyword, Item> {
@@ -36,19 +37,18 @@ impl<Keyword: Parse, Item: Parse> Parse for MetaItem<Keyword, Item> {
             input.parse()?
         };
 
-        Ok(Self {
-            ident,
-            item
-        })
+        Ok(Self { ident, item })
     }
 }
 
 struct BracketedList<Keyword: Parse, Item: Parse, Punctuation: Parse> {
     pub ident: Keyword,
-    pub list: punctuated::Punctuated<Item, Punctuation>
+    pub list: punctuated::Punctuated<Item, Punctuation>,
 }
 
-impl<Keyword: Parse, Item: Parse, Punctuation: Parse> Parse for BracketedList<Keyword, Item, Punctuation> {
+impl<Keyword: Parse, Item: Parse, Punctuation: Parse> Parse
+    for BracketedList<Keyword, Item, Punctuation>
+{
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let ident = input.parse()?;
         let _: Token![=] = input.parse()?;
@@ -60,16 +60,56 @@ impl<Keyword: Parse, Item: Parse, Punctuation: Parse> Parse for BracketedList<Ke
             Err(input.error("Could not find bracketed list."))
         }?;
 
-        Ok(Self {
-            ident,
-            list
-        })
+        Ok(Self { ident, list })
+    }
+}
+
+pub struct StateTracker {
+    pub feature: Option<syn::LitStr>,
+}
+
+impl Parse for StateTracker {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let feature = if input.peek(kw::feature) {
+            let MetaItem::<kw::feature, syn::LitStr> { item, .. } = input.parse()?;
+
+            let _: syn::Token![,] = input.parse()?;
+
+            Some(item)
+        } else {
+            None
+        };
+
+        Ok(Self { feature })
+    }
+}
+
+pub struct RawHook {
+    pub feature: Option<syn::LitStr>,
+    pub hook_args: TokenStream,
+}
+
+impl Parse for RawHook {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let feature = if input.peek(kw::feature) {
+            let MetaItem::<kw::feature, syn::LitStr> { item, .. } = input.parse()?;
+
+            let _: syn::Token![,] = input.parse()?;
+
+            Some(item)
+        } else {
+            None
+        };
+
+        let hook_args = input.parse()?;
+
+        Ok(Self { feature, hook_args })
     }
 }
 
 pub enum HookModule {
     Lazy(syn::LitStr),
-    Static(token::Static)
+    Static(token::Static),
 }
 
 impl Parse for HookModule {
@@ -85,7 +125,7 @@ impl Parse for HookModule {
 
 pub enum HookSymbol {
     Resolved(syn::Path),
-    Unresolved(syn::LitStr)
+    Unresolved(syn::LitStr),
 }
 
 impl Parse for HookSymbol {
@@ -101,18 +141,21 @@ impl Parse for HookSymbol {
 
 pub struct HookAttrs {
     pub module: HookModule,
-    pub symbol: HookSymbol
+    pub symbol: HookSymbol,
 }
 
 impl Parse for HookAttrs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let module = if input.peek(kw::module) {
-            let MetaItem::<kw::module, HookModule> { item: module_name, .. } = input.parse()?;
+            let MetaItem::<kw::module, HookModule> {
+                item: module_name, ..
+            } = input.parse()?;
 
             Ok(module_name)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "module".bright_blue()
+                "Expected keyword '{}' in macro declaration.",
+                "module".bright_blue()
             )))
         }?;
 
@@ -123,41 +166,36 @@ impl Parse for HookAttrs {
             Ok(symbol)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "symbol".bright_blue()
+                "Expected keyword '{}' in macro declaration.",
+                "symbol".bright_blue()
             )))
         }?;
 
-        Ok(HookAttrs {
-            module,
-            symbol
-        })
+        Ok(HookAttrs { module, symbol })
     }
 }
 
 pub enum Hashable {
     Literal(syn::LitStr),
     Constant(syn::Path),
-    Hashed(syn::Expr)
+    Hashed(syn::Expr),
 }
 
 impl ToTokens for Hashable {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            Hashable::Literal(lit) => {
-                quote!(
-                    smash::phx::Hash40::new(#lit)
-                ).to_tokens(tokens)
-            },
-            Hashable::Constant(path) => {
-                quote!(
-                    smash::phx::Hash40::new_raw(#path)
-                ).to_tokens(tokens)
-            },
-            Hashable::Hashed(expr) => {
-                quote!(
-                    smash::phx::Hash40::new_raw(#expr)
-                ).to_tokens(tokens)
-            }
+            Hashable::Literal(lit) => quote!(
+                smash::phx::Hash40::new(#lit)
+            )
+            .to_tokens(tokens),
+            Hashable::Constant(path) => quote!(
+                smash::phx::Hash40::new_raw(#path)
+            )
+            .to_tokens(tokens),
+            Hashable::Hashed(expr) => quote!(
+                smash::phx::Hash40::new_raw(#expr)
+            )
+            .to_tokens(tokens),
         }
     }
 }
@@ -168,12 +206,16 @@ impl Parse for Hashable {
             Ok(Hashable::Constant(constant))
         } else {
             let hashed = input.parse::<syn::Expr>()?;
-            if let syn::Expr::Lit(syn::ExprLit{ attrs: _, lit: syn::Lit::Str(lit)}) = hashed {
+            if let syn::Expr::Lit(syn::ExprLit {
+                attrs: _,
+                lit: syn::Lit::Str(lit),
+            }) = hashed
+            {
                 Ok(Hashable::Literal(lit))
             } else {
                 Ok(Hashable::Hashed(hashed))
             }
-        } 
+        }
     }
 }
 
@@ -181,7 +223,7 @@ pub struct AcmdAttrs {
     pub agent: Hashable,
     pub scripts: Vec<Hashable>,
     pub category: syn::Path,
-    pub low_priority: syn::LitBool
+    pub low_priority: syn::LitBool,
 }
 
 impl Parse for AcmdAttrs {
@@ -192,7 +234,8 @@ impl Parse for AcmdAttrs {
             Ok(hashable)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "agent".bright_blue()
+                "Expected keyword '{}' in macro declaration.",
+                "agent".bright_blue()
             )))
         }?;
 
@@ -202,13 +245,17 @@ impl Parse for AcmdAttrs {
 
             Ok(vec![hashable])
         } else if input.peek(kw::scripts) {
-            let BracketedList::<kw::scripts, Hashable, Token![,]> { list: hashables, .. } = input.parse()?;
-            
+            let BracketedList::<kw::scripts, Hashable, Token![,]> {
+                list: hashables, ..
+            } = input.parse()?;
+
             let scripts = hashables.into_iter().map(|x| x).collect();
             Ok(scripts)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' or '{}' in macro declaration.", "script".bright_blue(), "scripts".bright_blue()
+                "Expected keyword '{}' or '{}' in macro declaration.",
+                "script".bright_blue(),
+                "scripts".bright_blue()
             )))
         }?;
 
@@ -219,7 +266,8 @@ impl Parse for AcmdAttrs {
             Ok(category)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "category".bright_blue()
+                "Expected keyword '{}' in macro declaration.",
+                "category".bright_blue()
             )))
         }?;
 
@@ -227,9 +275,7 @@ impl Parse for AcmdAttrs {
             if let Ok(_) = input.parse::<kw::low_priority>() {
                 Ok(syn::LitBool::new(true, Span::call_site()))
             } else {
-                Err(input.error(
-                    "Extra comma in macro declaration."
-                ))
+                Err(input.error("Extra comma in macro declaration."))
             }
         } else {
             Ok(syn::LitBool::new(false, Span::call_site()))
@@ -239,29 +285,27 @@ impl Parse for AcmdAttrs {
             agent,
             scripts,
             category,
-            low_priority
+            low_priority,
         })
     }
 }
 
 pub enum LuaConst {
     Symbolic(syn::Path),
-    Evaluated(syn::Expr)
+    Evaluated(syn::Expr),
 }
 
 impl ToTokens for LuaConst {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            LuaConst::Symbolic(path) => {
-                quote!(
-                    smashline::LuaConstant::Symbolic(#path)
-                ).to_tokens(tokens)
-            },
-            LuaConst::Evaluated(expr) => {
-                quote!(
-                    smashline::LuaConstant::Evaluated(#expr)
-                ).to_tokens(tokens)
-            }
+            LuaConst::Symbolic(path) => quote!(
+                smashline::LuaConstant::Symbolic(#path)
+            )
+            .to_tokens(tokens),
+            LuaConst::Evaluated(expr) => quote!(
+                smashline::LuaConstant::Evaluated(#expr)
+            )
+            .to_tokens(tokens),
         }
     }
 }
@@ -273,7 +317,7 @@ impl Parse for LuaConst {
         } else {
             let evaluated = input.parse()?;
             Ok(LuaConst::Evaluated(evaluated))
-        } 
+        }
     }
 }
 
@@ -281,7 +325,7 @@ pub struct StatusAttrs {
     pub agent: Hashable,
     pub status: LuaConst,
     pub condition: LuaConst,
-    pub low_priority: syn::LitBool
+    pub low_priority: syn::LitBool,
 }
 
 impl Parse for StatusAttrs {
@@ -292,31 +336,38 @@ impl Parse for StatusAttrs {
             Ok(hashable)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "agent".bright_blue()
+                "Expected keyword '{}' in macro declaration.",
+                "agent".bright_blue()
             )))
         }?;
 
         let _: Token![,] = input.parse()?;
 
         let status = if input.peek(kw::status) {
-            let MetaItem::<kw::status, LuaConst> { item: lua_const, .. } = input.parse()?;
+            let MetaItem::<kw::status, LuaConst> {
+                item: lua_const, ..
+            } = input.parse()?;
 
             Ok(lua_const)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "status".bright_blue()
+                "Expected keyword '{}' in macro declaration.",
+                "status".bright_blue()
             )))
         }?;
 
         let _: Token![,] = input.parse()?;
 
         let condition = if input.peek(kw::condition) {
-            let MetaItem::<kw::condition, LuaConst> { item: lua_const, .. } = input.parse()?;
+            let MetaItem::<kw::condition, LuaConst> {
+                item: lua_const, ..
+            } = input.parse()?;
 
             Ok(lua_const)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "condition".bright_blue()
+                "Expected keyword '{}' in macro declaration.",
+                "condition".bright_blue()
             )))
         }?;
 
@@ -324,9 +375,7 @@ impl Parse for StatusAttrs {
             if let Ok(_) = input.parse::<kw::low_priority>() {
                 Ok(syn::LitBool::new(true, Span::call_site()))
             } else {
-                Err(input.error(
-                    "Extra comma in macro declaration."
-                ))
+                Err(input.error("Extra comma in macro declaration."))
             }
         } else {
             Ok(syn::LitBool::new(false, Span::call_site()))
@@ -336,7 +385,7 @@ impl Parse for StatusAttrs {
             agent,
             status,
             condition,
-            low_priority
+            low_priority,
         })
     }
 }
@@ -344,40 +393,46 @@ impl Parse for StatusAttrs {
 pub struct CommonStatusAttrs {
     pub status: LuaConst,
     pub condition: LuaConst,
-    pub symbol: Option<syn::LitStr>
+    pub symbol: Option<syn::LitStr>,
 }
 
 impl Parse for CommonStatusAttrs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let status = if input.peek(kw::status) {
-            let MetaItem::<kw::status, LuaConst> { item: lua_const, .. } = input.parse()?;
+            let MetaItem::<kw::status, LuaConst> {
+                item: lua_const, ..
+            } = input.parse()?;
 
             Ok(lua_const)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "status".bright_blue()
+                "Expected keyword '{}' in macro declaration.",
+                "status".bright_blue()
             )))
         }?;
 
         let _: Token![,] = input.parse()?;
 
         let condition = if input.peek(kw::condition) {
-            let MetaItem::<kw::condition, LuaConst> { item: lua_const, .. } = input.parse()?;
+            let MetaItem::<kw::condition, LuaConst> {
+                item: lua_const, ..
+            } = input.parse()?;
 
             Ok(lua_const)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.", "condition".bright_blue()
+                "Expected keyword '{}' in macro declaration.",
+                "condition".bright_blue()
             )))
         }?;
 
         let symbol = if let Ok(_) = input.parse::<Token![,]>() {
-            if let Ok(MetaItem::<kw::symbol, syn::LitStr> { item: symbol, .. }) = input.parse::<MetaItem::<kw::symbol, syn::LitStr>>() {
+            if let Ok(MetaItem::<kw::symbol, syn::LitStr> { item: symbol, .. }) =
+                input.parse::<MetaItem<kw::symbol, syn::LitStr>>()
+            {
                 Ok(Some(symbol))
             } else {
-                Err(input.error(
-                    "Extra comma in macro declaration."
-                ))
+                Err(input.error("Extra comma in macro declaration."))
             }
         } else {
             Ok(None)
@@ -386,20 +441,22 @@ impl Parse for CommonStatusAttrs {
         Ok(CommonStatusAttrs {
             status,
             condition,
-            symbol
+            symbol,
         })
     }
 }
 
 pub struct AgentFrameAttrs {
     pub agent: Option<LuaConst>,
-    pub is_replace: bool
+    pub is_replace: bool,
 }
 
 impl Parse for AgentFrameAttrs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let agent = if input.peek(kw::agent) {
-            let MetaItem::<kw::agent, LuaConst> { item: lua_const, .. } = input.parse()?;
+            let MetaItem::<kw::agent, LuaConst> {
+                item: lua_const, ..
+            } = input.parse()?;
 
             Ok(Some(lua_const))
         } else if input.peek(kw::global) {
@@ -407,7 +464,9 @@ impl Parse for AgentFrameAttrs {
             Ok(None)
         } else {
             Err(input.error(format!(
-                "Expected keywords '{}' or '{}' in macro declaration.", "agent".bright_blue(), "global".bright_blue()
+                "Expected keywords '{}' or '{}' in macro declaration.",
+                "agent".bright_blue(),
+                "global".bright_blue()
             )))
         }?;
 
@@ -415,17 +474,12 @@ impl Parse for AgentFrameAttrs {
             if let Ok(_) = input.parse::<Token![override]>() {
                 Ok(true)
             } else {
-                Err(input.error(
-                    "Extra comma in macro declaration."
-                ))
+                Err(input.error("Extra comma in macro declaration."))
             }
         } else {
             Ok(false)
         }?;
 
-        Ok(Self {
-            agent,
-            is_replace
-        })
+        Ok(Self { agent, is_replace })
     }
 }

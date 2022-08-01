@@ -1,13 +1,13 @@
 #![feature(asm)]
 #![feature(const_loop)]
 #![feature(const_if_match)]
-use syn::{Attribute, token, AttrStyle, Ident, parse_macro_input};
 use proc_macro::TokenStream;
-use proc_macro2::{TokenStream as TokenStream2, Span};
+use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{quote, ToTokens};
+use syn::{parse_macro_input, token, AttrStyle, Attribute, Ident};
 
-mod acmd_lang;
 mod acmd;
+mod acmd_lang;
 mod attrs;
 mod callbacks;
 mod derive;
@@ -45,11 +45,15 @@ pub(crate) fn new_attr(attr_name: &str, args: Option<&str>) -> syn::Attribute {
         TokenStream2::new()
     };
     syn::Attribute {
-        pound_token: token::Pound { spans: [Span::call_site()]},
+        pound_token: token::Pound {
+            spans: [Span::call_site()],
+        },
         style: AttrStyle::Outer,
-        bracket_token: token::Bracket { span: Span::call_site() },
+        bracket_token: token::Bracket {
+            span: Span::call_site(),
+        },
         path: Ident::new(attr_name, Span::call_site()).into(),
-        tokens
+        tokens,
     }
 }
 
@@ -127,26 +131,32 @@ pub fn install_agent_reset(input: TokenStream) -> TokenStream {
 pub fn installer(_: TokenStream, input: TokenStream) -> TokenStream {
     let mut usr_fn = parse_macro_input!(input as syn::ItemFn);
     usr_fn.sig.abi = Some(syn::Abi {
-        extern_token: syn::token::Extern { span: Span::call_site() },
-        name: Some(syn::LitStr::new("Rust", Span::call_site()))
+        extern_token: syn::token::Extern {
+            span: Span::call_site(),
+        },
+        name: Some(syn::LitStr::new("Rust", Span::call_site())),
     });
     quote! (
         #[export_name = "smashline_install"]
         #usr_fn
-    ).into()
+    )
+    .into()
 }
 
 #[proc_macro_attribute]
 pub fn uninstaller(_: TokenStream, input: TokenStream) -> TokenStream {
     let mut usr_fn = parse_macro_input!(input as syn::ItemFn);
     usr_fn.sig.abi = Some(syn::Abi {
-        extern_token: syn::token::Extern { span: Span::call_site() },
-        name: Some(syn::LitStr::new("Rust", Span::call_site()))
+        extern_token: syn::token::Extern {
+            span: Span::call_site(),
+        },
+        name: Some(syn::LitStr::new("Rust", Span::call_site())),
     });
     quote! (
         #[export_name = "smashline_uninstall"]
         #usr_fn
-    ).into()
+    )
+    .into()
 }
 
 #[proc_macro_attribute]
@@ -184,7 +194,47 @@ pub fn agent_init(_: TokenStream, input: TokenStream) -> TokenStream {
     callbacks::agent_init_callback(input, false)
 }
 
+#[proc_macro_attribute]
+pub fn raw_inline_hook(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    hook::raw_inline_hook(attrs, input)
+}
+
+#[proc_macro_attribute]
+pub fn raw_hook(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    hook::raw_hook(attrs, input)
+}
+
+#[proc_macro]
+pub fn development_state_tracker(input: TokenStream) -> TokenStream {
+    hook::development_state_tracker(input)
+}
+
+#[proc_macro]
+pub fn development_state_installed(_: TokenStream) -> TokenStream {
+    quote! {
+        unsafe {
+            crate::set_dev_plugin_available(true)
+        }
+    }
+    .into()
+}
+
+#[proc_macro]
+pub fn development_state_uninstalled(_: TokenStream) -> TokenStream {
+    quote! {
+        unsafe {
+            crate::set_dev_plugin_available(false)
+        }
+    }
+    .into()
+}
+
 #[proc_macro]
 pub fn install_agent_init_callback(input: TokenStream) -> TokenStream {
     callbacks::install_agent_init_callback(input)
+}
+
+#[proc_macro]
+pub fn install_raw_hook(input: TokenStream) -> TokenStream {
+    hook::install_raw_hook(input)
 }
