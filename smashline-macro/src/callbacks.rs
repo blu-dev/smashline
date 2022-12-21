@@ -23,7 +23,7 @@ fn generate_fighter_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Ident
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
-                    smashline::replace_symbol("common", "_ZN7lua2cpp16L2CFighterCommon31sys_line_system_control_fighterEv", #usr_fn_name as *const extern "C" fn(), Some(&mut #orig_name));
+                    smashline::replace_symbol("common", "_ZN7lua2cpp14L2CFighterBase30sys_line_status_system_controlEv", #usr_fn_name as *const extern "C" fn(), Some(&mut #orig_name));
                 }
             }
         ).into()
@@ -46,7 +46,7 @@ fn generate_weapon_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Ident,
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
-                    smashline::replace_symbol("common", "_ZN7lua2cpp14L2CFighterBase23sys_line_system_controlEv", #usr_fn_name as *const extern "C" fn(), Some(&mut #orig_name));
+                    smashline::replace_symbol("common", "_ZN7lua2cpp14L2CFighterBase30sys_line_status_system_controlEv", #usr_fn_name as *const extern "C" fn(), Some(&mut #orig_name));
                 }
             }
         ).into()
