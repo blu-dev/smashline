@@ -214,7 +214,7 @@ pub fn agent_frame_main(attrs: TokenStream, input: TokenStream) -> TokenStream {
         });
     }
 
-    generate_agent_main_install_fn(&attrs, &usr_fn_name, &orig_name)
+    let install_fn = generate_agent_main_install_fn(&attrs, &usr_fn_name, &orig_name);
 
     quote!(
         #usr_fn
@@ -312,7 +312,7 @@ pub fn agent_frame_main_callback(input: TokenStream) -> TokenStream {
     let usr_fn_name = usr_fn.sig.ident.clone();
     let install_name = quote::format_ident!("{}_smashline_agent_frame_callback_install", usr_fn_name);
 
-    quote!(
+    let install_fn = quote!(
         #[allow(non_snake_case)]
         pub fn #install_name() {
             unsafe {
