@@ -319,7 +319,7 @@ pub fn agent_frame_main_callback(input: TokenStream) -> TokenStream {
                 smashline::add_agent_frame_main_callback(#usr_fn_name);
             }
         }
-    )
+    );
 
     quote!(
         #usr_fn
