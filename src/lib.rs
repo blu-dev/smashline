@@ -6,10 +6,10 @@ use smash::lua2cpp::*;
 
 pub use smashline_macro::*;
 
-type FighterFrame = extern "C" fn(&mut L2CFighterCommon) -> L2CValue;
+type FighterFrame = extern "C" fn(&mut L2CFighterBase) -> L2CValue;
 type WeaponFrame = extern "C" fn(&mut L2CFighterBase) -> L2CValue;
 type AgentFrame = extern "C" fn(&mut L2CFighterBase) -> L2CValue;
-type FighterFrameCallback = fn(&mut L2CFighterCommon);
+type FighterFrameCallback = fn(&mut L2CFighterBase);
 type WeaponFrameCallback = fn(&mut L2CFighterBase);
 type AgentFrameCallback = fn(&mut L2CFighterBase);
 type FighterReset = fn(&mut L2CFighterCommon);
