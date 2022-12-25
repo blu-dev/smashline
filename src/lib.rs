@@ -108,7 +108,7 @@ extern "Rust" {
 
     pub fn replace_fighter_frame(agent: LuaConstant, original: Option<&'static mut *const extern "C" fn()>, replacement: FighterFrame);
     pub fn replace_weapon_frame(agent: LuaConstant, original: Option<&'static mut *const extern "C" fn()>, replacement: AgentFrame);
-    pub fn replace_agent_frame_main(agent: LuaConstant, original: Option<&'static mut *const extern "C" fn()>, replacement: FighterFrame);
+    pub fn replace_agent_frame_main(agent: LuaConstant, is_fighter: bool, original: Option<&'static mut *const extern "C" fn()>, replacement: FighterFrame);
 
     pub fn add_fighter_reset_callback(callback: FighterReset);
     pub fn add_agent_reset_callback(callback: AgentReset);
