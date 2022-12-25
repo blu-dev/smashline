@@ -492,8 +492,15 @@ impl Parse for AgentFrameAttrs {
         }?;
 
         if on_main {
-            (input.error("on main"));
-
+            is_replace = if let Ok(_) = input.parse::<Token![,]>() {
+                if let Ok(_) = input.parse::<Token![override]>() {
+                    Ok(true)
+                } else {
+                    Err(input.error("Extra comma in macro declaration."))
+                }
+            } else {
+                Ok(false)
+            }?;
         }
 
         Ok(Self { agent, on_main, is_replace })
