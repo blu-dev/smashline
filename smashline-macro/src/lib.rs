@@ -107,11 +107,6 @@ pub fn weapon_frame(attrs: TokenStream, input: TokenStream) -> TokenStream {
     callbacks::agent_frame(attrs, input, false)
 }
 
-#[proc_macro_attribute]
-pub fn agent_frame_main(attrs: TokenStream, input: TokenStream) -> TokenStream {
-    callbacks::agent_frame_main(attrs, input)
-}
-
 #[proc_macro]
 pub fn install_agent_frame(input: TokenStream) -> TokenStream {
     callbacks::install_agent_frame(input)
@@ -165,18 +160,13 @@ pub fn uninstaller(_: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn fighter_frame_callback(_: TokenStream, input: TokenStream) -> TokenStream {
-    callbacks::agent_frame_callback(input, true)
+pub fn fighter_frame_callback(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_frame_callback(attrs, input, true)
 }
 
 #[proc_macro_attribute]
-pub fn weapon_frame_callback(_: TokenStream, input: TokenStream) -> TokenStream {
-    callbacks::agent_frame_callback(input, false)
-}
-
-#[proc_macro_attribute]
-pub fn agent_frame_main_callback(_: TokenStream, input: TokenStream) -> TokenStream {
-    callbacks::agent_frame_main_callback(input)
+pub fn weapon_frame_callback(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_frame_callback(attrs, input, false)
 }
 
 #[proc_macro]

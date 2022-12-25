@@ -141,80 +141,15 @@ pub fn agent_frame(attrs: TokenStream, input: TokenStream, is_fighter: bool) -> 
         });
     }
 
-    let install_fn = if is_fighter {
-        generate_fighter_install_fn(&attrs, &usr_fn_name, &orig_name)
+    let install_fn = if attrs.on_main {
+        generate_agent_main_install_fn(&attrs, &usr_fn_name, &orig_name)
     } else {
-        generate_weapon_install_fn(&attrs, &usr_fn_name, &orig_name)
-    };
-
-    quote!(
-        #usr_fn
-        
-        #install_fn
-
-        #[allow(non_upper_case_globals)]
-        static mut #orig_name: *const extern "C" fn() = 0 as _;
-    ).into()
-}
-
-pub fn agent_frame_main(attrs: TokenStream, input: TokenStream) -> TokenStream {
-    let attrs = parse_macro_input!(attrs as AgentFrameAttrs);
-    let mut usr_fn = parse_macro_input!(input as syn::ItemFn);
-
-    let usr_fn_name = usr_fn.sig.ident.clone();
-
-    usr_fn.sig.abi = Some(syn::Abi {
-        extern_token: token::Extern { span: Span::call_site() },
-        name: Some(syn::LitStr::new("C", Span::call_site()))
-    });
-
-    let args_tokens = usr_fn.sig.inputs.iter().map(remove_mut);
-    if let syn::ReturnType::Default = usr_fn.sig.output {
-        if attrs.is_replace {
-            return syn::Error::new(
-                usr_fn.sig.ident.span(),
-                "Agent frames that 'override' must specify the return type. Try adding '-> smash::lib::L2CValue'"
-            ).into_compile_error().into();
-        }
-        usr_fn.sig.output = parse_quote! { -> smash::lib::L2CValue };
-    }
-    let return_tokens = usr_fn.sig.output.to_token_stream();
-
-    let orig_name = quote::format_ident!("{}_smashline_agent_frame_orig", usr_fn_name);
-
-    let orig_macro: syn::Stmt = parse_quote! {
-        macro_rules! original {
-            ($($args:expr),* $(,)?) => {
-                {
-                    #[allow(unused_unsafe)]
-                    if true {
-                        unsafe {
-                            if #orig_name.is_null() {
-                                panic!("Error calling agent frame {}, original function not in memory.", stringify!(#usr_fn_name));
-                            } else {
-                                std::mem::transmute::<_, extern "C" fn(#(#args_tokens),*) #return_tokens>(#orig_name)($($args),*)
-                            }
-                        }
-                    } else {
-                        unreachable!()
-                    }
-                }
-            }
+        if is_fighter {
+            generate_fighter_install_fn(&attrs, &usr_fn_name, &orig_name)
+        } else {
+            generate_weapon_install_fn(&attrs, &usr_fn_name, &orig_name)
         }
     };
-
-    usr_fn.block.stmts.insert(0, orig_macro);
-    if !attrs.is_replace {
-        let args_names = usr_fn.sig.inputs.iter().map(get_ident);
-        usr_fn.block.stmts.insert(1, parse_quote! {
-            let original_result = original!(#(#args_names),*);
-        });
-        usr_fn.block.stmts.push(parse_quote! {
-            return original_result;
-        });
-    }
-
-    let install_fn = generate_agent_main_install_fn(&attrs, &usr_fn_name, &orig_name);
 
     quote!(
         #usr_fn
@@ -275,51 +210,42 @@ pub fn install_agent_frame_callback(input: TokenStream) -> TokenStream {
     ).into()
 }
 
-pub fn agent_frame_callback(input: TokenStream, is_fighter: bool) -> TokenStream {
+pub fn agent_frame_callback(attrs: TokenStream, input: TokenStream, is_fighter: bool) -> TokenStream {
+    let attrs = parse_macro_input!(attrs as AgentFrameCallbackAttrs);
     let usr_fn = parse_macro_input!(input as syn::ItemFn);
     let usr_fn_name = usr_fn.sig.ident.clone();
     let install_name = quote::format_ident!("{}_smashline_agent_frame_callback_install", usr_fn_name);
 
-    let install_fn = if is_fighter {
+    let install_fn = if attrs.on_main {
         quote!(
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
-                    smashline::add_fighter_frame_callback(#usr_fn_name);
+                    smashline::add_agent_frame_main_callback(#usr_fn_name);
                 }
             }
         )
     } else {
-        quote!(
-            #[allow(non_snake_case)]
-            pub fn #install_name() {
-                unsafe {
-                    smashline::add_weapon_frame_callback(#usr_fn_name);
+        if is_fighter {
+            quote!(
+                #[allow(non_snake_case)]
+                pub fn #install_name() {
+                    unsafe {
+                        smashline::add_fighter_frame_callback(#usr_fn_name);
+                    }
                 }
-            }
-        )
-    };
-
-    quote!(
-        #usr_fn
-
-        #install_fn
-    ).into()
-}
-
-pub fn agent_frame_main_callback(input: TokenStream) -> TokenStream {
-    let usr_fn = parse_macro_input!(input as syn::ItemFn);
-    let usr_fn_name = usr_fn.sig.ident.clone();
-    let install_name = quote::format_ident!("{}_smashline_agent_frame_callback_install", usr_fn_name);
-
-    let install_fn = quote!(
-        #[allow(non_snake_case)]
-        pub fn #install_name() {
-            unsafe {
-                smashline::add_agent_frame_main_callback(#usr_fn_name);
-            }
+            )
+        } else {
+            quote!(
+                #[allow(non_snake_case)]
+                pub fn #install_name() {
+                    unsafe {
+                        smashline::add_weapon_frame_callback(#usr_fn_name);
+                    }
+                }
+            )
         }
-    );
+    };
 
     quote!(
         #usr_fn

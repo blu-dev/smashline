@@ -17,6 +17,7 @@ mod kw {
     syn::custom_keyword!(condition);
     syn::custom_keyword!(global);
     syn::custom_keyword!(feature);
+    syn::custom_keyword!(main);
 }
 
 // taken from skyline-rs hooking implementation
@@ -448,6 +449,7 @@ impl Parse for CommonStatusAttrs {
 
 pub struct AgentFrameAttrs {
     pub agent: Option<LuaConst>,
+    pub on_main: bool,
     pub is_replace: bool,
 }
 
@@ -470,16 +472,56 @@ impl Parse for AgentFrameAttrs {
             )))
         }?;
 
-        let is_replace = if let Ok(_) = input.parse::<Token![,]>() {
+        let mut is_replace = false;
+
+        let on_main = if let Ok(_) = input.parse::<Token![,]>() {
             if let Ok(_) = input.parse::<Token![override]>() {
+                is_replace = true;
+                Ok(false)
+            } else if let Ok(_) = input.parse::<kw::main>() {
+                is_replace = false;
                 Ok(true)
-            } else {
+            }
+            else {
+                is_replace = false;
                 Err(input.error("Extra comma in macro declaration."))
             }
         } else {
+            is_replace = false;
             Ok(false)
         }?;
 
-        Ok(Self { agent, is_replace })
+        if on_main {
+            let is_replace = if let Ok(_) = input.parse::<Token![,]>() {
+                if let Ok(_) = input.parse::<Token![override]>() {
+                    Ok(true)
+                } else {
+                    Err(input.error("Extra comma in macro declaration."))
+                }
+            } else {
+                Ok(false)
+            }?;
+        }
+
+        Ok(Self { agent, on_main, is_replace })
+    }
+}
+
+pub struct AgentFrameCallbackAttrs {
+    pub on_main: bool,
+}
+
+impl Parse for AgentFrameCallbackAttrs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let on_main = if let Ok(_) = input.parse::<kw::main>() {
+            Ok(true)
+        } else {
+            Err(input.error(format!(
+                "Expected keyword '{}' in macro declaration.",
+                "main".bright_blue()
+            )))
+        }?;
+
+        Ok(Self { on_main })
     }
 }
