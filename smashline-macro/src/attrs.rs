@@ -515,9 +515,11 @@ impl Parse for AgentFrameCallbackAttrs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let on_main = if let Ok(_) = input.parse::<kw::main>() {
             Ok(true)
+        } else if input.is_empty() {
+            Ok(false)
         } else {
             Err(input.error(format!(
-                "Expected keyword '{}' in macro declaration.",
+                "Expected keyword '{}' or nothing in macro declaration.",
                 "main".bright_blue()
             )))
         }?;
