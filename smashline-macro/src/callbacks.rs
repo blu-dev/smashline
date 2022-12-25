@@ -53,14 +53,14 @@ fn generate_weapon_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Ident,
     }
 }
 
-fn generate_agent_main_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Ident, orig_name: &syn::Ident, is_fighter: bool) -> TokenStream2 {
+fn generate_agent_main_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Ident, orig_name: &syn::Ident, is_fighter: &bool) -> TokenStream2 {
     let install_name = quote::format_ident!("{}_smashline_agent_frame_install", usr_fn_name);
     if let Some(agent) = &attrs.agent {
         quote!(
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
-                    smashline::replace_agent_frame_main(#agent, is_fighter, Some(&mut #orig_name), #usr_fn_name);
+                    smashline::replace_agent_frame_main(#agent, #is_fighter, Some(&mut #orig_name), #usr_fn_name);
                 }
             }
         ).into()
@@ -142,7 +142,7 @@ pub fn agent_frame(attrs: TokenStream, input: TokenStream, is_fighter: bool) -> 
     }
 
     let install_fn = if attrs.on_main {
-        generate_agent_main_install_fn(&attrs, &usr_fn_name, &orig_name, is_fighter)
+        generate_agent_main_install_fn(&attrs, &usr_fn_name, &orig_name, &is_fighter)
     } else {
         if is_fighter {
             generate_fighter_install_fn(&attrs, &usr_fn_name, &orig_name)
