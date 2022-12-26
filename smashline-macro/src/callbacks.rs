@@ -1,8 +1,11 @@
+use std::mem::transmute;
 use syn::{parse_quote, parse_macro_input, Token, token};
 use syn::parse::{Parse, ParseStream};
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{ToTokens, quote};
+use smash::lib::{L2CValue, LuaConst};
+use smash::lua2cpp::*;
 
 use crate::attrs::*;
 use crate::{remove_mut, get_ident};
@@ -60,7 +63,8 @@ fn generate_agent_main_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Id
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
-                    smashline::replace_agent_frame_main(#agent, #is_fighter, Some(&mut #orig_name), transmute(#usr_fn_name as extern "C" fn(&mut L2CFighterBase) -> L2CValue));
+                    let usr_fn_name: extern "C" fn(&mut L2CFighterBase) -> L2CValue = transmute(#usr_fn_name);
+                    smashline::replace_agent_frame_main(#agent, #is_fighter, Some(&mut #orig_name), usr_fn_name);
                 }
             }
         ).into()
@@ -221,7 +225,8 @@ pub fn agent_frame_callback(attrs: TokenStream, input: TokenStream, is_fighter: 
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
-                    smashline::add_agent_frame_main_callback(transmute(#usr_fn_name as fn(&mut L2CFighterBase)));
+                    let usr_fn_name: fn(&mut L2CFighterBase) = transmute(#usr_fn_name);
+                    smashline::add_agent_frame_main_callback(usr_fn_name);
                 }
             }
         )
