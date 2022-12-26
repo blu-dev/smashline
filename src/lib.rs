@@ -4,7 +4,7 @@ use smash::phx::Hash40;
 use smash::lib::{L2CValue, LuaConst};
 use smash::lua2cpp::*;
 
-//pub use smashline_macro::*;
+pub use smashline_macro::*;
 
 type FighterFrame = extern "C" fn(&mut L2CFighterCommon) -> L2CValue;
 type AgentFrame = extern "C" fn(&mut L2CFighterBase) -> L2CValue;

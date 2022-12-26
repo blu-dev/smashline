@@ -4,8 +4,6 @@ use syn::parse::{Parse, ParseStream};
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{ToTokens, quote};
-use smash::lib::{L2CValue, LuaConst};
-use smash::lua2cpp::*;
 
 use crate::attrs::*;
 use crate::{remove_mut, get_ident};
@@ -107,7 +105,7 @@ pub fn agent_frame(attrs: TokenStream, input: TokenStream, is_fighter: bool) -> 
                 "Agent frames that 'override' must specify the return type. Try adding '-> smash::lib::L2CValue'"
             ).into_compile_error().into();
         }
-        usr_fn.sig.output = parse_quote! { -> smash::lib::L2CValue };
+        usr_fn.sig.output = parse_quote! { -> L2CValue };
     }
     let return_tokens = usr_fn.sig.output.to_token_stream();
 
