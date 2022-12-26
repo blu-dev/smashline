@@ -61,6 +61,7 @@ fn generate_agent_main_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Id
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
+                    use std::mem::transmute;
                     let usr_fn_name: extern "C" fn(&mut L2CFighterBase) -> L2CValue = transmute(#usr_fn_name);
                     smashline::replace_agent_frame_main(#agent, #is_fighter, Some(&mut #orig_name), usr_fn_name);
                 }
@@ -105,7 +106,7 @@ pub fn agent_frame(attrs: TokenStream, input: TokenStream, is_fighter: bool) -> 
                 "Agent frames that 'override' must specify the return type. Try adding '-> smash::lib::L2CValue'"
             ).into_compile_error().into();
         }
-        usr_fn.sig.output = parse_quote! { -> L2CValue };
+        usr_fn.sig.output = parse_quote! { -> smash::lib::L2CValue };
     }
     let return_tokens = usr_fn.sig.output.to_token_stream();
 
@@ -223,6 +224,7 @@ pub fn agent_frame_callback(attrs: TokenStream, input: TokenStream, is_fighter: 
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
+                    use std::mem::transmute;
                     let usr_fn_name: fn(&mut L2CFighterBase) = transmute(#usr_fn_name);
                     smashline::add_agent_frame_main_callback(usr_fn_name);
                 }
