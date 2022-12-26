@@ -60,7 +60,7 @@ fn generate_agent_main_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Id
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
-                    smashline::replace_agent_frame_main(#agent, #is_fighter, Some(&mut #orig_name), #usr_fn_name);
+                    smashline::replace_agent_frame_main(#agent, #is_fighter, Some(&mut #orig_name), transmute(#usr_fn_name as extern "C" fn(&mut L2CFighterBase) -> L2CValue));
                 }
             }
         ).into()
@@ -221,7 +221,7 @@ pub fn agent_frame_callback(attrs: TokenStream, input: TokenStream, is_fighter: 
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
-                    smashline::add_agent_frame_main_callback(#usr_fn_name);
+                    smashline::add_agent_frame_main_callback(transmute(#usr_fn_name as fn(&mut L2CFighterBase)));
                 }
             }
         )
