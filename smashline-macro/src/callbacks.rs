@@ -141,15 +141,19 @@ pub fn agent_frame(attrs: TokenStream, input: TokenStream, is_fighter: bool) -> 
         });
         if is_fighter {
             usr_fn.block.stmts.insert(2, parse_quote! {
-                if StatusModule::is_changing(fighter.module_accessor) {
-                    return original_result;
+                unsafe {
+                    if StatusModule::is_changing(fighter.module_accessor) {
+                        return original_result;
+                    }
                 }
             });
         }
         else {
             usr_fn.block.stmts.insert(2, parse_quote! {
-                if StatusModule::is_changing(weapon.module_accessor) {
-                    return original_result;
+                unsafe {
+                    if StatusModule::is_changing(weapon.module_accessor) {
+                        return original_result;
+                    }
                 }
             });
         }
