@@ -1,3 +1,4 @@
+use std::mem::transmute;
 use syn::{parse_quote, parse_macro_input, Token, token};
 use syn::parse::{Parse, ParseStream};
 use proc_macro::TokenStream;
@@ -47,6 +48,31 @@ fn generate_weapon_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Ident,
             pub fn #install_name() {
                 unsafe {
                     smashline::replace_symbol("common", "_ZN7lua2cpp14L2CFighterBase23sys_line_system_controlEv", #usr_fn_name as *const extern "C" fn(), Some(&mut #orig_name));
+                }
+            }
+        ).into()
+    }
+}
+
+fn generate_agent_main_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Ident, orig_name: &syn::Ident, is_fighter: &bool) -> TokenStream2 {
+    let install_name = quote::format_ident!("{}_smashline_agent_frame_install", usr_fn_name);
+    if let Some(agent) = &attrs.agent {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe {
+                    use std::mem::transmute;
+                    let usr_fn_name: extern "C" fn(&mut L2CFighterBase) -> L2CValue = transmute(#usr_fn_name as *const ());
+                    smashline::replace_agent_frame_main(#agent, #is_fighter, Some(&mut #orig_name), usr_fn_name);
+                }
+            }
+        ).into()
+    } else {
+        quote!(
+            #[allow(non_snake_case)]
+            pub fn #install_name() {
+                unsafe {
+                    smashline::replace_symbol("common", "_ZN7lua2cpp14L2CFighterBase30sys_line_status_system_controlEv", #usr_fn_name as *const extern "C" fn(), Some(&mut #orig_name));
                 }
             }
         ).into()
@@ -113,15 +139,37 @@ pub fn agent_frame(attrs: TokenStream, input: TokenStream, is_fighter: bool) -> 
         usr_fn.block.stmts.insert(1, parse_quote! {
             let original_result = original!(#(#args_names),*);
         });
+        if is_fighter {
+            usr_fn.block.stmts.insert(2, parse_quote! {
+                unsafe {
+                    if StatusModule::is_changing(fighter.module_accessor) {
+                        return original_result;
+                    }
+                }
+            });
+        }
+        else {
+            usr_fn.block.stmts.insert(2, parse_quote! {
+                unsafe {
+                    if StatusModule::is_changing(weapon.module_accessor) {
+                        return original_result;
+                    }
+                }
+            });
+        }
         usr_fn.block.stmts.push(parse_quote! {
             return original_result;
         });
     }
 
-    let install_fn = if is_fighter {
-        generate_fighter_install_fn(&attrs, &usr_fn_name, &orig_name)
+    let install_fn = if attrs.on_main {
+        generate_agent_main_install_fn(&attrs, &usr_fn_name, &orig_name, &is_fighter)
     } else {
-        generate_weapon_install_fn(&attrs, &usr_fn_name, &orig_name)
+        if is_fighter {
+            generate_fighter_install_fn(&attrs, &usr_fn_name, &orig_name)
+        } else {
+            generate_weapon_install_fn(&attrs, &usr_fn_name, &orig_name)
+        }
     };
 
     quote!(
@@ -183,29 +231,43 @@ pub fn install_agent_frame_callback(input: TokenStream) -> TokenStream {
     ).into()
 }
 
-pub fn agent_frame_callback(input: TokenStream, is_fighter: bool) -> TokenStream {
+pub fn agent_frame_callback(attrs: TokenStream, input: TokenStream, is_fighter: bool) -> TokenStream {
+    let attrs = parse_macro_input!(attrs as AgentFrameCallbackAttrs);
     let usr_fn = parse_macro_input!(input as syn::ItemFn);
     let usr_fn_name = usr_fn.sig.ident.clone();
     let install_name = quote::format_ident!("{}_smashline_agent_frame_callback_install", usr_fn_name);
 
-    let install_fn = if is_fighter {
+    let install_fn = if attrs.on_main {
         quote!(
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
-                    smashline::add_fighter_frame_callback(#usr_fn_name);
+                    use std::mem::transmute;
+                    let usr_fn_name: fn(&mut L2CFighterBase) = transmute(#usr_fn_name as *const ());
+                    smashline::add_agent_frame_main_callback(usr_fn_name);
                 }
             }
         )
     } else {
-        quote!(
-            #[allow(non_snake_case)]
-            pub fn #install_name() {
-                unsafe {
-                    smashline::add_weapon_frame_callback(#usr_fn_name);
+        if is_fighter {
+            quote!(
+                #[allow(non_snake_case)]
+                pub fn #install_name() {
+                    unsafe {
+                        smashline::add_fighter_frame_callback(#usr_fn_name);
+                    }
                 }
-            }
-        )
+            )
+        } else {
+            quote!(
+                #[allow(non_snake_case)]
+                pub fn #install_name() {
+                    unsafe {
+                        smashline::add_weapon_frame_callback(#usr_fn_name);
+                    }
+                }
+            )
+        }
     };
 
     quote!(

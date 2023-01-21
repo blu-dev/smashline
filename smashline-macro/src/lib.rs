@@ -160,13 +160,13 @@ pub fn uninstaller(_: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn fighter_frame_callback(_: TokenStream, input: TokenStream) -> TokenStream {
-    callbacks::agent_frame_callback(input, true)
+pub fn fighter_frame_callback(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_frame_callback(attrs, input, true)
 }
 
 #[proc_macro_attribute]
-pub fn weapon_frame_callback(_: TokenStream, input: TokenStream) -> TokenStream {
-    callbacks::agent_frame_callback(input, false)
+pub fn weapon_frame_callback(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    callbacks::agent_frame_callback(attrs, input, false)
 }
 
 #[proc_macro]
