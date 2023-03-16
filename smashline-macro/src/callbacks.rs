@@ -61,8 +61,7 @@ fn generate_agent_main_install_fn(attrs: &AgentFrameAttrs, usr_fn_name: &syn::Id
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
-                    use smash::lua2cpp::L2CFighterBase;
-                    use smash::lib::L2CValue;
+                    use smash::{lua2cpp::L2CFighterBase, lib::L2CValue};
                     use std::mem::transmute;
                     let usr_fn_name: extern "C" fn(&mut L2CFighterBase) -> L2CValue = transmute(#usr_fn_name as *const ());
                     smashline::replace_agent_frame_main(#agent, #is_fighter, Some(&mut #orig_name), usr_fn_name);
@@ -226,8 +225,7 @@ pub fn agent_frame_callback(attrs: TokenStream, input: TokenStream, is_fighter: 
             #[allow(non_snake_case)]
             pub fn #install_name() {
                 unsafe {
-                    use smash::lua2cpp::L2CFighterBase;
-                    use smash::lib::L2CValue;
+                    use smash::{lua2cpp::L2CFighterBase, lib::L2CValue};
                     use std::mem::transmute;
                     let usr_fn_name: fn(&mut L2CFighterBase) = transmute(#usr_fn_name as *const ());
                     smashline::add_agent_frame_main_callback(usr_fn_name);
